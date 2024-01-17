@@ -15,12 +15,22 @@ RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y
 RUN pip install torch==1.11.0+cu115 torchvision==0.12.0+cu115 -f https://download.pytorch.org/whl/torch_stable.html
 
 # stuff
-RUN pip install numpy tqdm opencv-python
-RUN apt update && apt install unzip zip
-
-
+RUN pip install numpy tqdm opencv-python matplotlib
+RUN apt update && apt install unzip zip 
+# RUN apt update && apt install wget
 # git 
 RUN apt update && apt install -y git
 
+# clone sam with text and install dependecies in CPU model
+RUN git clone https://github.com/luca-medeiros/lang-segment-anything.git
 
-WORKDIR /preresearch
+WORKDIR /lang-segment-anything
+RUN pip install -e .
+
+# folder for video to segment
+RUN mkdir dataset 
+RUN mkdir vis_prompt
+
+# copy files to execute 
+COPY preresearch/segment_frames.py segment_frames.py
+COPY preresearch/vis_seg.py vis_seg.py
