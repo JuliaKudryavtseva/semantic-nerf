@@ -17,7 +17,7 @@ def parse_args():
 
     parser = argparse.ArgumentParser(description ='args for algorithm which makes frame consistant')
 
-    parser.add_argument('--data-path', type=str, default='dataset/assets/teatime',  help='Path to the data.')
+    parser.add_argument('--data-path', type=str, default='dataset/teatime',  help='Path to the data.')
     parser.add_argument('--text', type=str, default='bear', help='Here you can specify text prompt for the experiment.')
     return parser.parse_args()
 
@@ -40,7 +40,7 @@ if __name__ == '__main__':
     save_path = os.path.join('segmentation_results', OUTPUT_NAME)   # output
 
     os.makedirs(save_path, exist_ok=True)
-    os.makedirs(os.path.join('vis_prompt', 'sem_seg'), exist_ok=True)
+    os.makedirs(os.path.join('vis_prompt'), exist_ok=True)
     
     print('Experiment name: ', args.text, '\nInput path: ', video_path, 'Output path: ', save_path)
 
