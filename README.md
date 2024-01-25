@@ -9,8 +9,8 @@ docker build -t sem_nerf.preresearch -f preresearch/Dockerfile .
 docker run -it --rm \
            -v $PWD/preresearch/assets:/lang-segment-anything/dataset \
            -v $PWD/preresearch/vis_prompt:/lang-segment-anything/vis_prompt \
-           --name sem_nerf.preresearch \
-           sem_nerf.preresearch
+           --name kudryavtseva.preresearch \
+           kudryavtseva.preresearch
 
 
 # extract frames from video
