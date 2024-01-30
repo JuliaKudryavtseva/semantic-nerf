@@ -27,6 +27,21 @@ python3 vis_seg.py --exp-name 'brown teddy bear' --out-name 'brown_teddy_bear'
 
 ## Research
 
+Extract SAM features for images
+
+```
+DATA_PATH=teatime
+
+docker build -t kudryavtseva.sam_features -f image_segmentation/Dockerfile  .
+
+docker run --rm --gpus device=5 \
+            -e "DATA_PATH=$DATA_PATH" \
+            -v $PWD/data:/seg_masks/segment-anything/dataset \
+            --name kudryavtseva.sam_features \
+            kudryavtseva.sam_features
+
+```
+
 Create image
 
 ```
