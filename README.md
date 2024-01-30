@@ -25,11 +25,14 @@ python3 vis_seg.py --exp-name 'brown teddy bear' --out-name 'brown_teddy_bear'
 
 ```
 
+## Research
+
 Create image
 
 ```
 docker build --tag kudryavtseva/nerfstudio:version1 -f Dockerfile .
 ```
+
 Docker container 
 
 ```
