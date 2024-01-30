@@ -40,7 +40,8 @@ docker run --gpus all \
              -p 7087:7007 \                                      
              --rm \                                              
              -it \                                               
-             --memory=50gb \                                   
+             --memory=50gb \ 
+             --shm-size=50gb \                                  
              kudryavtseva/nerfstudio:version1            
 ```
 
