@@ -24,3 +24,34 @@ python3 segment_frames.py --text 'brown teddy bear'
 python3 vis_seg.py --exp-name 'brown teddy bear' --out-name 'brown_teddy_bear'
 
 ```
+
+Create image
+
+```
+docker build --tag kudryavtseva/nerfstudio:version1 -f Dockerfile .
+```
+Docker container 
+
+```
+docker run --gpus all \                                                                               
+             -v /folder/of/your/data:/workspace/ \               
+             -v /home/j.kudryavtseva/.cache/:/home/user/.cache/ \   
+             -u root \
+             -p 7087:7007 \                                      
+             --rm \                                              
+             -it \                                               
+             --memory=50gb \                                   
+             kudryavtseva/nerfstudio:version1            
+```
+
+```
+docker run --gpus all -v /home/j.kudryavtseva/.cache/:/home/user/.cache/ -u root -p 7087:7087 --rm -it --memory=50gb kudryavtseva/nerfstudio:version1   
+```
+
+
+cd method_nerf/
+pip install -e .
+ns-install-cli
+cd ..
+
+ns-train clip-nerf --data data/$DATA_PATH --vis viewer --viewer.websocket-port=7087
