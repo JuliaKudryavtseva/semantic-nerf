@@ -37,6 +37,7 @@ docker build -t kudryavtseva.sam_features -f image_segmentation/Dockerfile  .
 docker run --rm --gpus device=5 \
             -e "DATA_PATH=$DATA_PATH" \
             -v $PWD/data:/seg_masks/segment-anything/dataset \
+            -v $PWD/assets:/seg_masks/segment-anything/assets \
             --name kudryavtseva.sam_features \
             kudryavtseva.sam_features
 
