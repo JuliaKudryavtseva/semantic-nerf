@@ -4,7 +4,7 @@ FROM ubuntu:22.04
 RUN apt-get update && apt-get install -y python3 python3-pip
 RUN apt-get update && apt-get install ffmpeg libsm6 libxext6  -y 
 
-RUN pip install numpy torch torchvision tqdm opencv-python
+RUN pip install numpy torch torchvision tqdm opencv-python matplotlib
 
 
 # wget
@@ -15,6 +15,8 @@ RUN apt update && apt install -y git
 
 RUN mkdir seg_masks 
 RUN mkdir dataset
+RUN mkdir assets
+
 
 RUN cd seg_masks && git clone https://github.com/facebookresearch/segment-anything.git
 
@@ -23,6 +25,6 @@ RUN mkdir weights && cd weights && wget -q https://dl.fbaipublicfiles.com/segmen
 
 
 COPY image_segmentation/gt_sam_features.py  gt_sam_features.py
+COPY vis_features.py vis_features.py
 
-
-CMD python3 gt_sam_features.py --data-path $DATA_PATH --exp-name $DATA_PATH
+# CMD python3 gt_sam_features.py --data-path $DATA_PATH --exp-name $DATA_PATH
