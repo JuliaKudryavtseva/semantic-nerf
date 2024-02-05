@@ -27,4 +27,4 @@ RUN mkdir weights && cd weights && wget -q https://dl.fbaipublicfiles.com/segmen
 COPY image_segmentation/gt_sam_features.py  gt_sam_features.py
 COPY vis_features.py vis_features.py
 
-# CMD python3 gt_sam_features.py --data-path $DATA_PATH --exp-name $DATA_PATH
+CMD python3 gt_sam_features.py --data-path $DATA_PATH --exp-name $DATA_PATH
