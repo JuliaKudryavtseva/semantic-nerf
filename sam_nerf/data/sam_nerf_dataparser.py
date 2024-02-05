@@ -7,6 +7,7 @@ import math
 from dataclasses import dataclass, field
 from pathlib import Path, PurePath
 from typing import Optional, Type
+import os
 
 import numpy as np
 import torch
@@ -36,7 +37,9 @@ class SAMDataParserConfig(DataParserConfig):
 
     _target: Type = field(default_factory=lambda: SAMData)
     """target class to instantiate"""
-    data: Path = Path("/home/user/dev/nerfstudio/teatime")
+    exp_name = os.environ['DATA_PATH']
+    data_path = f"/home/user/dev/nerfstudio/{exp_name}"
+    data: Path = Path(data_path)
     """Directory or explicit json file path specifying location of data."""
     scale_factor: float = 1.0
     """How much to scale the camera origins by."""
