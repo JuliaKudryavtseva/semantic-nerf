@@ -27,7 +27,13 @@ python3 vis_seg.py --exp-name 'brown teddy bear' --out-name 'brown_teddy_bear'
 
 ## Research
 
-Extract SAM features for images
+### Extract SAM features for images
+
+```
+mkdir data
+
+data/ teatime/(images + json)
+```
 
 ```
 DATA_PATH=teatime
@@ -42,7 +48,7 @@ docker run --rm --gpus device=5 \
             kudryavtseva.sam_features
 
 ```
-
+### Semantic-NeRF
 Create image
 
 ```
@@ -75,3 +81,24 @@ ns-install-cli
 cd ..
 
 ns-train clip-nerf --data data/$DATA_PATH --vis viewer --viewer.websocket-port=7087
+
+
+### Decode masks
+
+```
+DATA_PATH=teatime
+
+docker build -t kudryavtseva.decoder -f mask_decoder/Dockerfile  .
+
+docker run -it --rm \
+            -e "DATA_PATH=$DATA_PATH" \
+            -v $PWD/mask_decoder:/workspace \
+            -v $PWD/data:/workspace/dataset \
+            -v $PWD/assets:/workspace/assets \
+            --name kudryavtseva.decoder \
+            kudryavtseva.decoder
+
+pip install -e .
+
+python3 decode_masks.py
+```
