@@ -27,6 +27,8 @@ def parse_args():
     parser.add_argument('--data-path', type=str, default='teatime',  help='Path to the data.')
     parser.add_argument('--exp-name', type=str, default='teatime', help='Here you can specify the name of the experiment.')
     parser.add_argument('--text-prompt', type=str, default='brown teddy bear', help='Here you can specify text prompt.')
+    parser.add_argument('--separate', type=str, default='False', help='Save every masks.')
+
     return parser.parse_args()
 
 
@@ -91,8 +93,10 @@ if __name__ == '__main__':
             mask = (np.array(masks).mean(axis=0) > 0).astype(int) # concat all masks in one frame
 
         vis_masks = visualise_frame_masks(mask)
-        plt.imshow(vis_masks)
-        plt.savefig(os.path.join(save_path, frame_pil))
+
+        # if args.separate:
+        #     plt.imshow(vis_masks)
+        #     plt.savefig(os.path.join(save_path, frame_pil))
 
 
         image_list.append(vis_masks)
