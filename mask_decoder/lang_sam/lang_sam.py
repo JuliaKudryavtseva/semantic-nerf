@@ -15,13 +15,6 @@ from lang_sam.sam_imitate import NeuralNetwork
 
 import warnings
 warnings.filterwarnings("ignore")
-# SAM_MODELS = {
-#     "vit_h": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth",
-#     "vit_l": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_l_0b3195.pth",
-#     "vit_b": "https://dl.fbaipublicfiles.com/segment_anything/sam_vit_b_01ec64.pth"
-# }
-
-# CACHE_PATH = os.environ.get("TORCH_HOME", os.path.expanduser("~/.cache/torch/hub/checkpoints"))
 
 
 def load_model_hf(repo_id, filename, ckpt_config_filename, device='cpu'):
@@ -63,12 +56,8 @@ class LangSAM():
             if self.sam_type is None:
                 print("No sam type indicated. Using vit_h by default.")
                 self.sam_type = "vit_h"
-            # checkpoint_url = SAM_MODELS[self.sam_type]
             try:
-                # sam = sam_model_registry[self.sam_type]()
-                # state_dict = torch.hub.load_state_dict_from_url(checkpoint_url)
-                # sam.load_state_dict(state_dict, strict=True)
-
+               
                 sam = sam_model_registry[self.sam_type](checkpoint=ckpt_path)
                 sam.image_encoder = NeuralNetwork()
 
