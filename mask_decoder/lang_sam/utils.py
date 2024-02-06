@@ -5,6 +5,9 @@ from PIL import Image
 from torchvision.utils import draw_bounding_boxes
 from torchvision.utils import draw_segmentation_masks
 
+import warnings
+warnings.filterwarnings("ignore")
+
 MIN_AREA = 100
 
 
