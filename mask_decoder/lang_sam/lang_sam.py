@@ -101,7 +101,6 @@ class LangSAM():
         image_array = np.asarray(image_pil)
         self.sam.set_image(image_array)
         self.sam.features = image_featues
-        # boxes = boxes[0].unsqueeze(0)
         transformed_boxes = self.sam.transform.apply_boxes_torch(boxes, image_array.shape[:2])
         masks, _, _ = self.sam.predict_torch(
             point_coords=None,
