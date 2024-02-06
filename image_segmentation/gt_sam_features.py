@@ -59,7 +59,6 @@ if __name__ == '__main__':
         # SAM segmentation
         sam_features_generator.set_image(image_array)
         sam_features = sam_features_generator.get_image_embedding()
-        sam_features = sam_features.squeeze(0)
 
         # save sam_features
         features_frame_name = image_pil.split('.')[0] + '_enc_features.pt'
