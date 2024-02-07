@@ -6,6 +6,7 @@ import argparse
 import time 
 import torch
 import matplotlib.pyplot as plt
+import cv2
 
 import numpy as np
 from lang_sam import LangSAM
@@ -76,9 +77,15 @@ if __name__ == '__main__':
 
         frame_feature_path = os.path.join(feature_path, frame_feature)
         image_features = torch.load(frame_feature_path, map_location='cpu')
+
+        # RESIZE HERE
+        feature_list=[]
+        for ind in range(256):
+            features = image_features[0, ind, :, :].detach().numpy()
+            sam_feature = cv2.resize( features, (64, 64), interpolation = cv2.INTER_AREA )
         
         # Text SAM segmentation
-        masks, boxes, phrases, logits = model.predict(image_featues=image_features, 
+        masks, boxes, phrases, logits = model.predict(image_featues=sam_feature, 
                                                       image_pil=image_pill,
                                                       text_prompt=TEXT_PROMPT)
 
