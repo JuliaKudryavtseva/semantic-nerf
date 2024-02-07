@@ -5,6 +5,7 @@ from PIL import Image
 import argparse
 import time 
 import torch
+import cv2
 
 import numpy as np
 from segment_anything import sam_model_registry, SamAutomaticMaskGenerator, SamPredictor
@@ -55,15 +56,25 @@ if __name__ == '__main__':
         image =Image.open(image_path)
         image = image.convert('RGB')
         image_array = np.array(image)
+
+        H, W, _ = image_array.shape
         
         # SAM segmentation
         sam_features_generator.set_image(image_array)
         sam_features = sam_features_generator.get_image_embedding()
 
+        # RESIZE 
+        feature_list=[]
+        for ind in range(256):
+            feature_map = sam_features[0, ind, :, :].detach().numpy()
+            unlarge = cv2.resize(feature_map, (W, H), interpolation = cv2.INTER_CUBIC )
+            feature_list.append(unlarge)
+
+        features = torch.tensor(np.array(feature_list)[None, ...])
+
         # save sam_features
         features_frame_name = image_pil.split('.')[0] + '_enc_features.pt'
-        
-        torch.save(sam_features, os.path.join(path2frame_save, features_frame_name))
+        torch.save(features, os.path.join(path2frame_save, features_frame_name))
 
         results[image_pil] = os.path.join('seg_features', features_frame_name)
 
