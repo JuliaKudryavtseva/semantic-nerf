@@ -33,31 +33,26 @@ docker build --tag kudryavtseva/nerfstudio:version1 -f Dockerfile .
 Docker container 
 
 ```
-docker run --gpus all \                                                                               
-             -v /folder/of/your/data:/workspace/ \               
-             -v /home/j.kudryavtseva/.cache/:/home/user/.cache/ \   
-             -u root \
-             -p 7087:7007 \                                      
-             --rm \                                              
-             -it \                                               
-             --memory=50gb \ 
-             --shm-size=50gb \                                  
-             kudryavtseva/nerfstudio:version1            
-```
-
-```
-docker run --gpus all -v /home/j.kudryavtseva/.cache/:/home/user/.cache/ -u root -p 7087:7087 --rm -it --memory=50gb kudryavtseva/nerfstudio:version1   
-```
 
 
-cd method_nerf/
+docker run -it --rm --gpus device=5 -p 7087:7087 --memory=50gb --shm-size=50gb  -e "DATA_PATH=$DATA_PATH" -v $PWD:/workspace -v /home/j.kudryavtseva/.cache/:/home/user/.cache -u root --name  kudryavtseva.sem_nerf gbobrovskikh.nerfstudio:dev   
+
+```
+
 pip install -e .
 ns-install-cli
-cd ..
 
 ns-train clip-nerf --data data/$DATA_PATH --vis viewer --viewer.websocket-port=7087
 
 
+
+
+
+
+
+```
+docker run --gpus all -v /home/j.kudryavtseva/.cache/:/home/user/.cache/ -u root -p 7087:7087 --rm -it --memory=50gb gbobrovskikh.nerfstudio:dev
+```
 ### Decode masks
 
 ```
