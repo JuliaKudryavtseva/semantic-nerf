@@ -7,6 +7,7 @@ import time
 import torch
 import cv2
 
+import pickle
 import numpy as np
 from segment_anything import sam_model_registry, SamAutomaticMaskGenerator, SamPredictor
 
@@ -40,10 +41,11 @@ if __name__ == '__main__':
 
     OUTPUT_NAME = args.exp_name 
     save_path = os.path.join('dataset', OUTPUT_NAME, 'segmentation_results')   # output
-    os.makedirs(os.path.join(save_path, 'seg_features'), exist_ok=True)
+
 
     # save sam features in save_path
     path2frame_save = os.path.join(save_path, 'seg_features')
+    os.makedirs(path2frame_save, exist_ok=True)
     
     print('Experiment name: ', args.exp_name, '\nInput path: ', video_path, 'Output path: ', save_path)
 
@@ -63,20 +65,30 @@ if __name__ == '__main__':
         sam_features_generator.set_image(image_array)
         sam_features = sam_features_generator.get_image_embedding()
 
-        # RESIZE 
-        feature_list=[]
-        for ind in range(256):
-            feature_map = sam_features[0, ind, :, :].detach().numpy()
-            unlarge = cv2.resize(feature_map, (W, H), interpolation = cv2.INTER_CUBIC )
-            feature_list.append(unlarge)
 
-        features = torch.tensor(np.array(feature_list)[None, ...])
+        sam_features = sam_features[0].flatten(1).cpu().detach().numpy()
+        sam_feature_dict={}
+        for pix_ind in range(64*64):
+            sam_feature_dict[pix_ind] = sam_features[:, pix_ind]
 
         # save sam_features
-        features_frame_name = image_pil.split('.')[0] + '_enc_features.pt'
-        torch.save(features, os.path.join(path2frame_save, features_frame_name))
+        features_frame_name = image_pil.split('.')[0] + '_enc_features.pkl'
+        features_frame_path = os.path.join(path2frame_save, features_frame_name)
+
+        with open((features_frame_path), 'wb') as f:
+            pickle.dump(sam_feature_dict, f)
 
         results[image_pil] = os.path.join('seg_features', features_frame_name)
 
+
+    # RESIZE map
+    x = np.arange(64*64).reshape(64, 64).astype('float32')
+    y = cv2.resize(x, (W, H), interpolation = cv2.INTER_NEAREST)
+
+    frame_map_path = os.path.join(save_path, 'features_map.npy') 
+    np.save(frame_map_path, y.astype(int))
+
     with open(os.path.join(save_path, f'{OUTPUT_NAME}.json') , 'w', encoding='utf-8') as f:
         json.dump(results, f, ensure_ascii=False, indent=4)
+
+    
