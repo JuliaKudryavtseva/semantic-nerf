@@ -73,7 +73,7 @@ class SAMData(DataParser):
         else:
             meta = load_from_json(self.config.data / "transforms.json")
             data_dir = self.config.data
-
+ 
         image_filenames = []
         poses = []
         num_skipped_image_filenames = 0
@@ -243,7 +243,6 @@ class SAMData(DataParser):
             replace_this_path = str(empty_path / images_folder) 
 
             seg_filenames_path = load_from_json(self.config.data / "segmentation_results" / "teatime.json")
-
             filenames_array = [seg_filenames_path/image_filename for image_filename in seg_filenames.values()]
         
             sam_featurs_map = SAM_features(filenames_array=filenames_array)
@@ -254,7 +253,7 @@ class SAMData(DataParser):
             scene_box=scene_box,
             dataparser_scale=scale_factor,
             dataparser_transform=transform_matrix,
-            metadata={"sam": sam_featurs_map} 
+            metadata={"sam_features": sam_featurs_map} 
         )
         return dataparser_outputs
 
