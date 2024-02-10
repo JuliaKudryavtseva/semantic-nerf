@@ -73,7 +73,7 @@ class SAMNerfField(Field):
         spatial_distortion: Optional[SpatialDistortion] = None,
         implementation: Literal["tcnn", "torch"] = "tcnn",
         use_sam: bool = True,
-        sam_n_dims: int = 512,
+        sam_n_dims: int = 256,
     ) -> None:
         super().__init__()
 
@@ -90,14 +90,13 @@ class SAMNerfField(Field):
         # EMBEDDING 4 IMAGES
         self.embedding_appearance = Embedding(self.num_images, self.appearance_embedding_dim)
         self.use_average_appearance_embedding = use_average_appearance_embedding
-        # CLIP 
+        # SAM 
         self.use_sam = use_sam
         self.pass_semantic_gradients = pass_semantic_gradients
         self.pass_sam_gradients = pass_sam_gradients
         self.base_res = base_res
-        # self.step = 0
 
-        # ENCODDING 4 IMAGES
+        # ENCODDING FOR IMAGES
         self.direction_encoding = SHEncoding(
             levels=4,
             implementation=implementation,
@@ -140,9 +139,9 @@ class SAMNerfField(Field):
                 out_activation=None,
                 implementation=implementation,
             )
-            self.field_head_clip = SAMFieldHead(
+            self.field_head_sam = SAMFieldHead(
                 in_dim=self.mlp_sam.get_out_dim(), # [bs, 64]
-                sam_n_dims=sam_n_dims # [bs, 512] 
+                sam_n_dims=sam_n_dims # [bs, 256] 
             )
         
         self.mlp_head = MLP(
@@ -239,15 +238,16 @@ class SAMNerfField(Field):
         # rgb:  torch.Size([4096, 48, 3]) 
         rgb = self.mlp_head(h).view(*outputs_shape, -1).to(directions)
         outputs.update({FieldHeadNames.RGB: rgb})
-
-        # Semantic block
+    
+        #  Semantic block
         if self.use_sam:
-            sam_input = rgb
+            sem_block_input = density_embedding.view(-1, self.geo_feat_dim)
+            
             if not self.pass_sam_gradients:
-                sam_input = sam_input.detach()
+                sem_block_input = sem_block_input.detach()
 
-            x = self.mlp_clip(rgb).view(*outputs_shape, -1).to(directions) # CAHNGE DIM
-            outputs[SAMFieldHeadNames.SAM] = self.field_head_clip(x)
+            x = self.mlp_sam(sem_block_input).view(*outputs_shape, -1).to(directions)
+            outputs[SAMFieldHeadNames.SAM] = self.field_head_sam(x)
 
         return outputs
  
