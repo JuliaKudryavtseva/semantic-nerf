@@ -241,11 +241,15 @@ class SAMData(DataParser):
             images_folder = f"images"
             empty_path = Path()
             replace_this_path = str(empty_path / images_folder) 
+            sam_path_emb = 'segmentation_results/seg_features'
+            filemap = Path(self.config.data / 'segmentation_results/features_map.npy')
 
-            seg_filenames_path = load_from_json(self.config.data / "segmentation_results" / "teatime.json")
-            filenames_array = [seg_filenames_path/image_filename for image_filename in seg_filenames.values()]
-        
-            sam_featurs_map = SAM_features(filenames_array=filenames_array)
+            filenames_emb = [
+                    Path(str(image_filename).replace(replace_this_path, sam_path_emb).replace(".jpg", "_enc_features.pkl"))
+                    for image_filename in image_filenames
+                ]
+            
+            sam_featurs_data = SAM_features(filemap=filemap, filenames_emb=filenames_emb)
 
         dataparser_outputs = DataparserOutputs(
             image_filenames=image_filenames,
@@ -253,7 +257,7 @@ class SAMData(DataParser):
             scene_box=scene_box,
             dataparser_scale=scale_factor,
             dataparser_transform=transform_matrix,
-            metadata={"sam_features": sam_featurs_map} 
+            metadata={"sam_features": sam_featurs_data} 
         )
         return dataparser_outputs
 
