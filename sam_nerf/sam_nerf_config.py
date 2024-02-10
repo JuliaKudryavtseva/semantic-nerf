@@ -17,12 +17,12 @@ from nerfstudio.data.datamanagers.base_datamanager import (
 )
 from sam_nerf.data.sam_nerf_dataparser import SAMDataParserConfig
 from sam_nerf.data.sam_dataset import SAMDataset
-from sam_nerf.sam_nerf import SAMNerfModel
+from sam_nerf.sam_nerf import SAMNerfModelConfig
 
 
-sam_nerf_mathod = MethodSpecification(
+sam_nerf_method = MethodSpecification(
     config=TrainerConfig(
-        method_name="sam_nerf",  # TODO: rename to your own model
+        method_name="sam-nerf",  # TODO: rename to your own model
         steps_per_eval_batch=500,
         steps_per_save=2000,
         max_num_iterations=30000,
@@ -34,7 +34,7 @@ sam_nerf_mathod = MethodSpecification(
                 train_num_rays_per_batch=4096,
                 eval_num_rays_per_batch=4096,
             ),
-            model=SAMNerfModel(
+            model=SAMNerfModelConfig(
                 eval_num_rays_per_chunk=8192,
             ),
         ),
