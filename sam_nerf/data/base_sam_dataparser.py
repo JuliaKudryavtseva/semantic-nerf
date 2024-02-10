@@ -5,7 +5,7 @@ from typing import List
 
 @dataclass
 class SAM_features:
-    filemap_array: Path
+    filemap: Path
     """filename to load sam features map tensor"""
     filenames_emb: List[Path]
     """filenames to load sam features tensor"""
