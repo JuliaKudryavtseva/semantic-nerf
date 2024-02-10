@@ -14,7 +14,6 @@ import numpy as np
 from numpy.linalg import norm
 from sklearn.metrics.pairwise import cosine_similarity as cs
 import pickle
-import open_clip
 
 import nerfacc
 import torch
@@ -42,9 +41,10 @@ from nerfstudio.models.base_model import Model, ModelConfig
 from nerfstudio.utils import colormaps
 from nerfstudio.viewer.server.viewer_elements import ViewerText
 
-from clip_nerf.clip_nerf_fieldheadname import ClipFieldHeadNames
-from clip_nerf.clip_nerf_renderer import CLIPRenderer
-from clip_nerf.clip_nerf_fields import ClipNerfField
+from sam_nerf.sam_nerf_fieldheadname import SAMFieldHeadNames
+from sam_nerf.sam_nerf_fields import SAMNerfField
+from sam_nerf.sam_nerf_renderer import SAMRenderer
+
 
 @dataclass
 class SAMNerfModelConfig(ModelConfig):
@@ -82,55 +82,56 @@ class SAMNerfModelConfig(ModelConfig):
     """The color that is given to untrained areas."""
     disable_scene_contraction: bool = False
     """Whether to disable scene contraction or not."""
-    clip_loss_weight: float = 0.1
+    sam_loss_weight: float = 0.1
     reg_loss_weight: float = 0.1
 
+
 class SAMNerfModel(Model):
-    """Clip Nerf model
+    """Sematic NeRF model
 
     Args:
-        config: clip-nerf configuration to instantiate model
+        config: sam_nerf configuration to instantiate model
     """
 
     config: SAMNerfModelConfig
-    field: ClipNerfField
+    field: SAMNerfField
 
     def __init__(self, config: SAMNerfModelConfig, metadata: Dict, **kwargs) -> None:
         
         super().__init__(config=config, **kwargs)
 
-        # DICT WITH CLIP EMBEDDINGS
+        # DICT WITH SAM EMBEDDINGS
 
         data_path = os.environ['DATA_PATH']
-        path_clip = f"data/{data_path}/embeddings_hash/embeddings/" #figurines
+        path_clip = f"data/{data_path}/segmentation_results/seg_features/" #figurines
         self.pickle_emb = {}
 
         for fname in os.listdir(path_clip):
             with open(path_clip + fname, 'rb') as h:
-                clip_emb_dict = pickle.load(h)
-            self.pickle_emb[int(fname.split("_")[1])] = clip_emb_dict
+                sam_emb_dict = pickle.load(h)
+            self.pickle_emb[int(fname.split("_")[1])] = sam_emb_dict
 
-        # DICT WITH CLIP EMBEDDINGS
+        # DICT WITH SAM EMBEDDINGS
 
     def populate_modules(self):
         """Set the fields and modules."""
         super().populate_modules()
 
-        # CREATE CLIP MODEL
+        # # CREATE SAM MODEL
 
-        self.clip_model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-32', pretrained='laion2b_s34b_b79k')
-        self.clip_model = self.clip_model.cuda()
-        self.tokenizer = open_clip.get_tokenizer('ViT-B-32')
-        self.positive_input = ViewerText("Text Positives", "", cb_hook=self.gui_cb)
+        # self.clip_model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-32', pretrained='laion2b_s34b_b79k')
+        # self.clip_model = self.clip_model.cuda()
+        # self.tokenizer = open_clip.get_tokenizer('ViT-B-32')
+        # self.positive_input = ViewerText("Text Positives", "", cb_hook=self.gui_cb)
 
-        # CREATE CLIP MODEL
+        # # CREATE SAM MODEL
 
         if self.config.disable_scene_contraction:
             scene_contraction = None
         else:
-            scene_contraction = (order=floaSceneContractiont("inf"))
+            scene_contraction = SceneContraction(order=float("inf"))
 
-        self.field = ClipNerfField(
+        self.field = SAMNerfField(
             aabb=self.scene_box.aabb,
             appearance_embedding_dim=0 if self.config.use_appearance_embedding else 32,
             num_images=self.num_train_data,
@@ -160,7 +161,7 @@ class SAMNerfModel(Model):
         # renderers
         self.renderer_rgb = RGBRenderer(background_color=self.config.background_color)
         self.renderer_accumulation = AccumulationRenderer()
-        self.renderer_clip = CLIPRenderer()
+        self.renderer_sam = SAMRenderer()
 
         # losses
         self.rgb_loss = MSELoss()
@@ -173,18 +174,18 @@ class SAMNerfModel(Model):
         self.max_raw_relevancy = 0
         self.min_raw_relevancy = 1
 
-    # TOKENIZER FOR TEXT PROMPT
-    def gui_cb(self,element):
-        self.set_positives(element.value.split(";"))
+    # # TOKENIZER FOR TEXT PROMPT
+    # def gui_cb(self,element):
+    #     self.set_positives(element.value.split(";"))
 
-    def set_positives(self, text_list):
-        self.positives = text_list
-        with torch.no_grad():
-            tok_phrases = torch.cat([self.tokenizer(phrase) for phrase in self.positives]).to("cuda")
-            self.pos_embeds = self.clip_model.encode_text(tok_phrases)
-        self.pos_embeds /= self.pos_embeds.norm(dim=-1, keepdim=True)
+    # def set_positives(self, text_list):
+    #     self.positives = text_list
+    #     with torch.no_grad():
+    #         tok_phrases = torch.cat([self.tokenizer(phrase) for phrase in self.positives]).to("cuda")
+    #         self.pos_embeds = self.clip_model.encode_text(tok_phrases)
+    #     self.pos_embeds /= self.pos_embeds.norm(dim=-1, keepdim=True)
 
-    # TOKENIZER FOR TEXT PROMPT 
+    # # TOKENIZER FOR TEXT PROMPT 
 
     def get_training_callbacks(
         self, training_callback_attributes: TrainingCallbackAttributes
@@ -205,12 +206,9 @@ class SAMNerfModel(Model):
 
     def get_param_groups(self) -> Dict[str, List[Parameter]]:
         param_groups = {}
-
         if self.field is None:
             raise ValueError("populate_fields() must be called before get_param_groups")
-
         param_groups["fields"] = list(self.field.parameters())
-        
         return param_groups
 
 
@@ -248,6 +246,7 @@ class SAMNerfModel(Model):
             ray_indices=ray_indices,
             num_rays=num_rays,
         )
+
         accumulation = self.renderer_accumulation(weights=weights, ray_indices=ray_indices, num_rays=num_rays)
 
         outputs = {
@@ -256,22 +255,22 @@ class SAMNerfModel(Model):
             "num_samples_per_ray": packed_info[:, 1],
         }
 
-        # CLIP OUTPUT
+        # SAM OUTPUT
         if self.training:
-            outputs["clip"] = self.renderer_clip(
-                    embeds=field_outputs[ClipFieldHeadNames.CLIP], 
+            outputs["sam_features"] = self.renderer_sam(
+                    embeds=field_outputs[SAMFieldHeadNames.SAM], 
                     weights=weights.detach(), 
                     ray_indices=ray_indices, 
                     num_rays=num_rays
-                ) # weights.detach()
+                )
 
-        # CLIP OUTPUT
+        # SAM OUTPUT
 
-        # CLIP PREDICITON
+        # SAM PREDICITON
         
         if not self.training:
             with torch.no_grad(): 
-                max_across = self.get_max_across(
+                max_across = self.get_sam_vis(
                     ray_samples,
                     weights,
                     ray_indices,
@@ -280,7 +279,7 @@ class SAMNerfModel(Model):
 
             outputs["raw_relevancy"] = max_across  # B x 1 
         return outputs
-        # CLIP PREDICITON   
+        # SAM PREDICITON   
 
     def get_metrics_dict(self, outputs, batch):
         metrics_dict = {}
@@ -302,20 +301,22 @@ class SAMNerfModel(Model):
         loss_dict = {"rgb_loss": rgb_loss}
 
         # USE\DEFINE CLIP EMBADDINGS
+        # resize here
 
-        batch["clip"] = []
-        for ind_emb, ind_frame in zip(batch['clip_array'], batch['clip_emb']):
-            batch["clip"].append(self.pickle_emb[int(ind_frame)][int(ind_emb)])
-        batch["clip"] = torch.Tensor(np.array(batch['clip']))
+        batch["pred_sam_features"] = []
+        for ind_emb, ind_frame in zip(batch['sam_features_map'], batch['sam_features_emb']):
+            batch["pred_sam_features"].append(self.pickle_emb[int(ind_frame)][int(ind_emb)])
+
+        batch["pred_sam_features"] = torch.Tensor(np.array(batch['pred_sam_features']))
 
         # USE\DEFINE CLIP EMBADDINGS
 
         # DEFINE LOSS (CLIP, PREDICTED CLIP)
         if self.training:
-            loss_clip = self.config.clip_loss_weight * torch.nn.functional.huber_loss(
-                outputs["clip"], batch["clip"].to(self.device), delta=1.25, reduction="none"
+            loss_sem = self.config.sam_loss_weight * torch.nn.functional.huber_loss(
+                outputs["sam_features"], batch["pred_sam_features"].to(self.device), delta=1.25, reduction="none"
             )
-            loss_dict["clip_loss"] = loss_clip.sum(dim=-1).nanmean() 
+            loss_dict["sam_loss"] = loss_sem.sum(dim=-1).nanmean() 
 
         # DEFINE LOSS (CLIP, PREDICTED CLIP)
         
@@ -353,28 +354,30 @@ class SAMNerfModel(Model):
         return metrics_dict, images_dict
 
 
-    # ---clip visualisation---
+    # ---sam visualisation---
     
-    def get_max_across(self, ray_samples, weights, ray_indices, num_rays):
+    def get_sam_vis(self, ray_samples, weights, ray_indices, num_rays):
         field_outputs = self.field(ray_samples)
 
-        clip_output = self.renderer_clip(
-                embeds=field_outputs[ClipFieldHeadNames.CLIP], 
+        sam_output = self.renderer_sam(
+                embeds=field_outputs[SAMFieldHeadNames.SAM], 
                 weights=weights.detach(),
                 ray_indices=ray_indices, 
                 num_rays=num_rays
             ) 
         
-        self.positives = self.positive_input.value.split(";")
+        # self.positives = self.positive_input.value.split(";")
         
-        with torch.no_grad():
-            tok_phrases = torch.cat([self.tokenizer(phrase) for phrase in self.positives]).to("cuda")
-            self.pos_embeds = self.clip_model.encode_text(tok_phrases)
+        # with torch.no_grad():
+        #     tok_phrases = torch.cat([self.tokenizer(phrase) for phrase in self.positives]).to("cuda")
+        #     self.pos_embeds = self.clip_model.encode_text(tok_phrases)
         
-        self.pos_embeds /= self.pos_embeds.norm(dim=-1, keepdim=True) 
-        pos_prob = torch.mm(clip_output, self.pos_embeds.T)       
-        return pos_prob # Bx1
-    
+        # self.pos_embeds /= self.pos_embeds.norm(dim=-1, keepdim=True) 
+        # pos_prob = torch.mm(clip_output, self.pos_embeds.T)       
+        # return pos_prob # Bx1
+        return sam_output[:, 4, :, :]
+
+    # MODEL PREDICITON
     @torch.no_grad()
     def get_outputs_for_camera_ray_bundle(self, camera_ray_bundle: RayBundle) -> Dict[str, torch.Tensor]:
         # Takes in camera parameters and computes the output of the model.
@@ -392,11 +395,12 @@ class SAMNerfModel(Model):
             for output_name, output in outputs.items():  
                 outputs_lists[output_name].append(output)
 
-        # CLIP RELEVANCY
+        # SAM RELEVANCY
         outputs = {}
         for output_name, outputs_list in outputs_lists.items():
             outputs[output_name] = torch.cat(outputs_list).view(image_height, image_width, -1)  
-        outputs["raw_relevancy"] = (outputs["raw_relevancy"] - outputs["raw_relevancy"].min())/(outputs["raw_relevancy"].max() - outputs["raw_relevancy"].min())
-        max_raw = outputs["raw_relevancy"].max()
-        outputs[f"relevancy_map"] = (outputs["raw_relevancy"] > 0.9*max_raw).float() # 0.9 бинарная маска релевантности
+
+        # outputs["raw_relevancy"] = (outputs["raw_relevancy"] - outputs["raw_relevancy"].min())/(outputs["raw_relevancy"].max() - outputs["raw_relevancy"].min())
+        # max_raw = outputs["raw_relevancy"].max()
+        # outputs[f"relevancy_map"] = (outputs["raw_relevancy"] > 0.9*max_raw).float() # 0.9 бинарная маска релевантности
         return outputs
