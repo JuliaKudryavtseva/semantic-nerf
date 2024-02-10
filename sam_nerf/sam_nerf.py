@@ -122,7 +122,7 @@ class SAMNerfModel(Model):
         # self.clip_model, _, preprocess = open_clip.create_model_and_transforms('ViT-B-32', pretrained='laion2b_s34b_b79k')
         # self.clip_model = self.clip_model.cuda()
         # self.tokenizer = open_clip.get_tokenizer('ViT-B-32')
-        # self.positive_input = ViewerText("Text Positives", "", cb_hook=self.gui_cb)
+        self.positive_input = ViewerText("Text Positives", "", cb_hook=self.gui_cb)
 
         # # CREATE SAM MODEL
 
@@ -174,9 +174,10 @@ class SAMNerfModel(Model):
         self.max_raw_relevancy = 0
         self.min_raw_relevancy = 1
 
-    # # TOKENIZER FOR TEXT PROMPT
-    # def gui_cb(self,element):
-    #     self.set_positives(element.value.split(";"))
+    # TOKENIZER FOR TEXT PROMPT
+    def gui_cb(self,element):
+        # self.set_positives(element.value.split(";"))
+        pass
 
     # def set_positives(self, text_list):
     #     self.positives = text_list
@@ -270,14 +271,14 @@ class SAMNerfModel(Model):
         
         if not self.training:
             with torch.no_grad(): 
-                max_across = self.get_sam_vis(
+                vis_4_channel = self.get_sam_vis(
                     ray_samples,
                     weights,
                     ray_indices,
                     num_rays                 
                 )
 
-            outputs["raw_relevancy"] = max_across  # B x 1 
+            outputs["vis_4_channel"] = vis_4_channel  # B x 1 
         return outputs
         # SAM PREDICITON   
 
@@ -375,7 +376,8 @@ class SAMNerfModel(Model):
         # self.pos_embeds /= self.pos_embeds.norm(dim=-1, keepdim=True) 
         # pos_prob = torch.mm(clip_output, self.pos_embeds.T)       
         # return pos_prob # Bx1
-        return sam_output[:, 4, :, :]
+
+        return sam_output[:, 4]
 
     # MODEL PREDICITON
     @torch.no_grad()
@@ -395,12 +397,13 @@ class SAMNerfModel(Model):
             for output_name, output in outputs.items():  
                 outputs_lists[output_name].append(output)
 
-        # SAM RELEVANCY
+        # # SAM RELEVANCY
         outputs = {}
         for output_name, outputs_list in outputs_lists.items():
             outputs[output_name] = torch.cat(outputs_list).view(image_height, image_width, -1)  
 
         # outputs["raw_relevancy"] = (outputs["raw_relevancy"] - outputs["raw_relevancy"].min())/(outputs["raw_relevancy"].max() - outputs["raw_relevancy"].min())
-        # max_raw = outputs["raw_relevancy"].max()
-        # outputs[f"relevancy_map"] = (outputs["raw_relevancy"] > 0.9*max_raw).float() # 0.9 бинарная маска релевантности
+        # # max_raw = outputs["raw_relevancy"].max()
+        # # outputs[f"relevancy_map"] = (outputs["raw_relevancy"] > 0.9*max_raw).float() # 0.9 бинарная маска релевантности
+        # return outputs
         return outputs
