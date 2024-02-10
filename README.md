@@ -39,7 +39,7 @@ docker run -it --rm --gpus device=5 -p 7087:7087 --memory=50gb --shm-size=50gb  
 
 ```
 
-pip install -e .
+pip install -e . 
 ns-install-cli
 
 ns-train sam-nerf --data data/$DATA_PATH --vis viewer --viewer.websocket-port=7087
