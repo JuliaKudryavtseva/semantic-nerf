@@ -26,7 +26,7 @@ class SAMDataset(InputDataset):
         self.device = torch.device
         
     def get_metadata(self, data: Dict) -> Dict:
-        feature_map_path = self.sam_features.filemap_array
+        feature_map_path = self.sam_features.filemap
         feature_map = torch.from_numpy(np.load(feature_map_path)).cuda()
 
         filepath_emb = self.sam_features.filenames_emb[data["image_idx"]]
