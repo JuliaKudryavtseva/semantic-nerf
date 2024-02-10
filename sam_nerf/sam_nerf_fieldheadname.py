@@ -3,4 +3,4 @@ from enum import Enum
 
 class SAMFieldHeadNames(Enum):
     """Possible field outputs"""
-    SAM = "sam"
+    SAM = "sam_features"
