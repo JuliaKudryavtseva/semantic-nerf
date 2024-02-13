@@ -10,7 +10,9 @@ import cv2
 import pickle
 import numpy as np
 from segment_anything import sam_model_registry, SamAutomaticMaskGenerator, SamPredictor
+from segment_anything.utils.transforms import ResizeLongestSide
 
+resizer = ResizeLongestSide(1024)
 
 
 # parsing args
@@ -65,10 +67,15 @@ if __name__ == '__main__':
         sam_features_generator.set_image(image_array)
         sam_features = sam_features_generator.get_image_embedding()
 
+        # resizer
+        h, w = resizer.get_preprocess_shape(image_array.shape[0], image_array.shape[1], 1024)
+        h_new, w_new = int(np.ceil(h/16)), int(np.ceil(w/16))
+        sam_features= sam_features[:, :, :h_new, :w_new]
+
 
         sam_features = sam_features[0].flatten(1).cpu().detach().numpy()
         sam_feature_dict={}
-        for pix_ind in range(64*64):
+        for pix_ind in range(h_new*w_new):
             sam_feature_dict[pix_ind] = sam_features[:, pix_ind]
 
         # save sam_features
@@ -82,7 +89,7 @@ if __name__ == '__main__':
 
 
     # RESIZE map
-    x = np.arange(64*64).reshape(64, 64).astype('float32')
+    x = np.arange(h_new*w_new).reshape(h_new, w_new).astype('float32')
     y = cv2.resize(x, (W, H), interpolation = cv2.INTER_NEAREST)
 
     frame_map_path = os.path.join(save_path, 'features_map.npy') 
