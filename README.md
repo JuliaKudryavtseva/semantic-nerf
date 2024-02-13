@@ -4,10 +4,15 @@
 
 ### Extract SAM features for images
 
+https://huggingface.co/datasets/ethanweber/Mip-NeRF_360_Processed_with_Nerfstudio/tree/main
+
 ```
 mkdir data
 
 data/ teatime/(images + json)
+
+ pip install nerfbaselines
+ nerfbaselines download-dataset mipnerf360/kitchen -o kitchen
 ```
 
 ```
@@ -49,7 +54,8 @@ ns-viewer --load-config outputs/teatime/sam-nerf/2024-02-12_203351/config.yml --
 
 ns-render dataset --load-config outputs/teatime/sam-nerf/2024-02-12_203351/config.yml --rendered-output-names raw-sam_features  --colormap-options.colormap-min -1 --split test
 
-
+# render rgb
+ns-render dataset --load-config outputs/teatime/sam-nerf/2024-02-12_203351/config.yml --rendered-output-names rgb --split test
 
 ```
 docker run --gpus all -v /home/j.kudryavtseva/.cache/:/home/user/.cache/ -u root -p 7087:7087 --rm -it --memory=50gb gbobrovskikh.nerfstudio:dev
@@ -66,6 +72,7 @@ docker run -it --rm \
             -v $PWD/mask_decoder:/workspace \
             -v $PWD/data:/workspace/dataset \
             -v $PWD/assets:/workspace/assets \
+            -v $PWD/renders:/workspace/renders \
             --name kudryavtseva.decoder \
             kudryavtseva.decoder
 
