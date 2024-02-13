@@ -44,9 +44,10 @@ ns-install-cli
 
 ns-train sam-nerf --data data/$DATA_PATH --vis viewer --viewer.websocket-port=7087
 
+ns-viewer --load-config outputs/teatime/sam-nerf/2024-02-12_203351/config.yml --viewer.websocket-port=7087
 
 
-
+ns-render dataset --load-config outputs/teatime/sam-nerf/2024-02-12_203351/config.yml --rendered-output-names raw-sam_features  --colormap-options.colormap-min -1 --split test
 
 
 
