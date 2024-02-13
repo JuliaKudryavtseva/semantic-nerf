@@ -271,14 +271,14 @@ class SAMNerfModel(Model):
         
         if not self.training:
             with torch.no_grad(): 
-                vis_4_channel = self.get_sam_vis(
+                sam_features = self.get_sam_vis(
                     ray_samples,
                     weights,
                     ray_indices,
                     num_rays                 
                 )
 
-            outputs["vis_4_channel"] = vis_4_channel  # B x 1 
+            outputs["sam_features"] = sam_features # B x 1 
         return outputs
         # SAM PREDICITON   
 
@@ -375,9 +375,9 @@ class SAMNerfModel(Model):
         
         # self.pos_embeds /= self.pos_embeds.norm(dim=-1, keepdim=True) 
         # pos_prob = torch.mm(clip_output, self.pos_embeds.T)       
-        # return pos_prob # Bx1
+        # return pos_prob # Bx1 [:, 4]
 
-        return sam_output[:, 4]
+        return sam_output
 
     # MODEL PREDICITON
     @torch.no_grad()
@@ -397,13 +397,11 @@ class SAMNerfModel(Model):
             for output_name, output in outputs.items():  
                 outputs_lists[output_name].append(output)
 
-        # # SAM RELEVANCY
+        # SAM RELEVANCY
         outputs = {}
         for output_name, outputs_list in outputs_lists.items():
-            outputs[output_name] = torch.cat(outputs_list).view(image_height, image_width, -1)  
+            outputs[output_name] = torch.cat(outputs_list).view(image_height, image_width, -1) 
 
-        # outputs["raw_relevancy"] = (outputs["raw_relevancy"] - outputs["raw_relevancy"].min())/(outputs["raw_relevancy"].max() - outputs["raw_relevancy"].min())
-        # # max_raw = outputs["raw_relevancy"].max()
-        # # outputs[f"relevancy_map"] = (outputs["raw_relevancy"] > 0.9*max_raw).float() # 0.9 бинарная маска релевантности
-        # return outputs
+        # outputs["sam_features"] = outputs["sam_features"].cpu().detach()
+        
         return outputs
