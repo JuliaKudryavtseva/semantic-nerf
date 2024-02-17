@@ -45,6 +45,7 @@ from sam_nerf.sam_nerf_fieldheadname import SAMFieldHeadNames
 from sam_nerf.sam_nerf_fields import SAMNerfField
 from sam_nerf.sam_nerf_renderer import SAMRenderer
 
+# from sam_nerf.mask_decoder.lang_sam import LangSAM
 
 @dataclass
 class SAMNerfModelConfig(ModelConfig):
@@ -82,8 +83,9 @@ class SAMNerfModelConfig(ModelConfig):
     """The color that is given to untrained areas."""
     disable_scene_contraction: bool = False
     """Whether to disable scene contraction or not."""
-    sam_loss_weight: float = 0.1
+    sam_loss_weight: float = 0.5
     reg_loss_weight: float = 0.1
+    
 
 
 class SAMNerfModel(Model):
@@ -177,9 +179,10 @@ class SAMNerfModel(Model):
     # TOKENIZER FOR TEXT PROMPT
     def gui_cb(self,element):
         # self.set_positives(element.value.split(";"))
+        # self.set_positives(element)
         pass
 
-    # def set_positives(self, text_list):
+    # def set_positives(self, text):
     #     self.positives = text_list
     #     with torch.no_grad():
     #         tok_phrases = torch.cat([self.tokenizer(phrase) for phrase in self.positives]).to("cuda")
@@ -375,7 +378,8 @@ class SAMNerfModel(Model):
         
         # self.pos_embeds /= self.pos_embeds.norm(dim=-1, keepdim=True) 
         # pos_prob = torch.mm(clip_output, self.pos_embeds.T)       
-        # return pos_prob # Bx1 [:, 4]
+        # return pos_prob # Bx1 [B, 256]
+
 
         return sam_output
 
@@ -401,7 +405,5 @@ class SAMNerfModel(Model):
         outputs = {}
         for output_name, outputs_list in outputs_lists.items():
             outputs[output_name] = torch.cat(outputs_list).view(image_height, image_width, -1) 
-
-        # outputs["sam_features"] = outputs["sam_features"].cpu().detach()
-        
+            
         return outputs
