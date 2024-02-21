@@ -25,7 +25,7 @@ sam_nerf_method = MethodSpecification(
         method_name="sam-nerf",  # TODO: rename to your own model
         steps_per_eval_batch=500,
         steps_per_save=2000,
-        max_num_iterations=100_000,
+        max_num_iterations=30_000,
         mixed_precision=True,
         pipeline=DynamicBatchPipelineConfig(
             datamanager=VanillaDataManagerConfig(
@@ -46,9 +46,9 @@ sam_nerf_method = MethodSpecification(
             # },
             "fields": {
                 "optimizer": RAdamOptimizerConfig(lr=1e-2, eps=1e-15),
-                "scheduler": ExponentialDecaySchedulerConfig(lr_final=1e-3, max_steps=30000),
+                "scheduler": ExponentialDecaySchedulerConfig(lr_final=1e-3, max_steps=30_000),
             },
-            # "camera_opt": {ssh 
+            # "camera_opt": {
             #     "optimizer": AdamOptimizerConfig(lr=1e-3, eps=1e-15),
             #     "scheduler": ExponentialDecaySchedulerConfig(lr_final=1e-4, max_steps=5000),
             # },
