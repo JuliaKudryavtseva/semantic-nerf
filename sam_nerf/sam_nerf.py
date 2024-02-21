@@ -35,6 +35,7 @@ from nerfstudio.model_components.ray_samplers import VolumetricSampler
 from nerfstudio.model_components.renderers import (
     AccumulationRenderer,
     RGBRenderer,
+    DepthRenderer,
 ) 
 from nerfstudio.model_components.scene_colliders import NearFarCollider 
 from nerfstudio.models.base_model import Model, ModelConfig
@@ -45,7 +46,6 @@ from sam_nerf.sam_nerf_fieldheadname import SAMFieldHeadNames
 from sam_nerf.sam_nerf_fields import SAMNerfField
 from sam_nerf.sam_nerf_renderer import SAMRenderer
 
-# from sam_nerf.mask_decoder.lang_sam import LangSAM
 
 @dataclass
 class SAMNerfModelConfig(ModelConfig):
@@ -83,7 +83,7 @@ class SAMNerfModelConfig(ModelConfig):
     """The color that is given to untrained areas."""
     disable_scene_contraction: bool = False
     """Whether to disable scene contraction or not."""
-    sam_loss_weight: float = 0.5
+    sam_loss_weight: float = 0.9
     reg_loss_weight: float = 0.1
     
 
@@ -164,9 +164,11 @@ class SAMNerfModel(Model):
         self.renderer_rgb = RGBRenderer(background_color=self.config.background_color)
         self.renderer_accumulation = AccumulationRenderer()
         self.renderer_sam = SAMRenderer()
+        self.renderer_depth = DepthRenderer(method="expected")
 
         # losses
         self.rgb_loss = MSELoss()
+        self.sam_loss = MSELoss()
 
         # metrics
         self.psnr = PeakSignalNoiseRatio(data_range=1.0)
@@ -242,7 +244,16 @@ class SAMNerfModel(Model):
             sigmas=field_outputs[FieldHeadNames.DENSITY][..., 0],
             packed_info=packed_info,
         )[0]
+
         weights = weights[..., None]
+        depth = self.renderer_depth(weights=weights, 
+                                    ray_samples=ray_samples, 
+                                    ray_indices=ray_indices,
+                                    num_rays=num_rays,
+                                    )
+
+        # weights_depth = ray_samples.get_weights(field_outputs[FieldHeadNames.DENSITY])
+
 
         rgb = self.renderer_rgb(
             rgb=field_outputs[FieldHeadNames.RGB],
@@ -257,6 +268,7 @@ class SAMNerfModel(Model):
             "rgb": rgb,
             "accumulation": accumulation,
             "num_samples_per_ray": packed_info[:, 1],
+            "depth": depth
         }
 
         # SAM OUTPUT
@@ -313,14 +325,23 @@ class SAMNerfModel(Model):
 
         batch["pred_sam_features"] = torch.Tensor(np.array(batch['pred_sam_features']))
 
+    
         # USE\DEFINE CLIP EMBADDINGS
-
+        pred_sam_features_device = batch["pred_sam_features"].to(self.device)
         # DEFINE LOSS (CLIP, PREDICTED CLIP)
         if self.training:
-            loss_sem = self.config.sam_loss_weight * torch.nn.functional.huber_loss(
-                outputs["sam_features"], batch["pred_sam_features"].to(self.device), delta=1.25, reduction="none"
-            )
-            loss_dict["sam_loss"] = loss_sem.sum(dim=-1).nanmean() 
+            loss_sem_mse = self.sam_loss(outputs["sam_features"], pred_sam_features_device)
+            loss_dict["sam_loss"] = self.config.sam_loss_weight*loss_sem_mse
+
+        if self.training:
+            loss = outputs["depth"].detach() * (abs (outputs["sam_features"]-pred_sam_features_device))
+            loss_dict["reg_loss"] = self.config.reg_loss_weight * loss.nanmean()
+
+            
+            # loss_sem_cos = self.config.sam_loss_weight * torch.nn.functional.huber_loss(
+            #     outputs["sam_features"], batch["pred_sam_features"].to(self.device), delta=1.25, reduction="none"
+            # )
+            # loss_sem_cos = loss_sem_cos.sum(dim=-1).nanmean() 
 
         # DEFINE LOSS (CLIP, PREDICTED CLIP)
         
