@@ -52,6 +52,7 @@ if __name__ == '__main__':
     print('Experiment name: ', args.exp_name, '\nInput path: ', video_path, 'Output path: ', save_path)
 
     results = {}
+    rest_features = []
 
     for image_pil in tqdm(frames):
         # read image
@@ -66,11 +67,16 @@ if __name__ == '__main__':
         # SAM segmentation
         sam_features_generator.set_image(image_array)
         sam_features = sam_features_generator.get_image_embedding()
-
+        
         # resizer
         h, w = resizer.get_preprocess_shape(image_array.shape[0], image_array.shape[1], 1024)
         h_new, w_new = int(np.ceil(h/16)), int(np.ceil(w/16))
-        sam_features= sam_features[:, :, :h_new, :w_new]
+
+        # make better
+        band_features = sam_features[:, :, h_new:, :w_new]
+        rest_features.append(band_features)
+        sam_features = sam_features[:, :, :h_new, :w_new]
+
 
 
         sam_features = sam_features[0].flatten(1).cpu().detach().numpy()
@@ -94,6 +100,11 @@ if __name__ == '__main__':
 
     frame_map_path = os.path.join(save_path, 'features_map.npy') 
     np.save(frame_map_path, y.astype(int))
+
+    rest_features = torch.cat(rest_features, dim = 0) # 180, 256, 16, 64
+    rest_features = rest_features.mean(dim=0).unsqueeze(0)
+    rest_features_path = os.path.join(save_path, 'rest_features.npy') 
+    np.save(rest_features_path, rest_features.cpu().detach().numpy())
 
     with open(os.path.join(save_path, f'{OUTPUT_NAME}.json') , 'w', encoding='utf-8') as f:
         json.dump(results, f, ensure_ascii=False, indent=4)
