@@ -40,7 +40,11 @@ def resize(large_features, fmap):
         fill_h, fill_w =64, 64-new_dim
 
     features = torch.cat(list_large_f, dim=0).reshape(new_h, new_w, 256).permute(2, 0, 1).unsqueeze(0)
-    features = torch.cat([features, torch.zeros((1, 256, fill_h, fill_w))], dim=2)
+
+    # coeffs = features.mean(dim=(2, 3)).repeat_interleave(fill_h*fill_w, 1).reshape(1, 256, fill_h, fill_w)
+    # coeffs*torch.ones((1, 256, fill_h, fill_w))
+
+    features = torch.cat([features, rest_features], dim=2)
     return features
 
 # feature_list=[]
@@ -48,10 +52,16 @@ def resize(large_features, fmap):
 #     features = image_features[ind, :, :].detach().numpy()
 #     sam_feature = cv2.resize( features, (64, 64), interpolation = cv2.INTER_AREA )
 
-def visualise_frame_masks(mask):
-    # mask = mask[0].cpu().detach().numpy()
-    final_mask = Image.fromarray((255*mask).astype('uint8'), mode="L")
-    return final_mask
+def visualise_frame_masks(mask, image_pil):
+    red_ch = mask[:, :, np.newaxis]
+    green_ch = np.zeros_like(mask)[:, :, np.newaxis]
+    blue_ch =  np.zeros_like(mask)[:, :, np.newaxis]
+
+    colored_mask = np.concatenate([255*red_ch, green_ch, blue_ch], axis=2)
+
+    result = (0.5*np.array(image_pil)).astype(int) +(0.5*colored_mask).astype(int)
+    # final_mask = Image.fromarray((255*mask).astype('uint8'), mode="L")
+    return result
 
 
 def load_npy_gz(filename):
@@ -92,14 +102,15 @@ if __name__ == '__main__':
     video_path = os.path.join('renders/test/rgb')  
     frames = sorted(os.listdir(video_path), key=lambda x: int(x.split('.')[0].split('_')[1]))
 
-    feature_path = os.path.join('renders/test/raw-sam_features') 
+    feature_path = os.path.join('renders/test/raw-sam_features_background') 
     feature_frames = sorted(os.listdir(feature_path), key=lambda x: int(x.split('.')[0].split('_')[1])) 
 
     # output
     save_path = os.path.join('assets', OUTPUT_NAME, 'vis_prompt', TEXT_PROMPT)   
     os.makedirs(save_path, exist_ok=True)
 
-    fmap = np.load('dataset/teatime/segmentation_results/features_map.npy')
+    fmap = np.load('data/teatime/segmentation_results/features_map.npy')
+    rest_features = torch.tensor(np.load('data/teatime/segmentation_results/rest_features.npy'))
 
     # ---------------------------- 
     
@@ -113,16 +124,9 @@ if __name__ == '__main__':
 
         frame_feature_path = os.path.join(feature_path, frame_feature)
         image_features = load_npy_gz(frame_feature_path)
-        # plt.imshow(image_features[ :, :, 4])
-        # plt.savefig(os.path.join('assets', frame_pil))
-       
-
+        
         # RESIZE HERE
         sam_feature=resize(image_features, fmap)
-        
-        # plt.imshow(sam_feature[0, 4, :, :])
-        # plt.savefig(os.path.join('assets', frame_pil))
-
         
         # Text SAM segmentation
         masks, boxes, phrases, logits = model.predict(image_featues=sam_feature, 
@@ -134,22 +138,34 @@ if __name__ == '__main__':
             H, W = np.array(image_pill).shape[:2]
             mask = np.zeros((H, W))
         else:
-            ind_rel = torch.argmax(logits)
-            mask = masks[ind_rel].squeeze().numpy()
-            # masks = [mask.squeeze().numpy() for mask in masks]
-            # mask = (np.array(masks).mean(axis=0) > 0).astype(int) # concat all masks in one frame
+            # ind_rel = torch.argmax(logits)
+            # mask = masks[ind_rel].squeeze().numpy()
+            masks = [mask.squeeze().numpy() for mask in masks]
+            mask = (np.array(masks).mean(axis=0) > 0).astype(int) # concat all masks in one frame
 
-        vis_masks = visualise_frame_masks(mask)
+        # smoothing
+        opening = cv2.morphologyEx(mask.astype('uint8'), cv2.MORPH_OPEN, np.ones((10,10), np.uint8))
+        mask = cv2.filter2D(opening,-1, np.ones((20,20),np.float32)/400)
+
+
+        vis_masks = visualise_frame_masks(mask, image_pill)
 
         if args.separate:
-            plt.imshow(vis_masks)
+
+            fig, ax = plt.subplots()
+            ax.imshow(vis_masks)
+            ax.axis('off')
+
+            for box, logit in zip(boxes, logits):
+                x_min, y_min, x_max, y_max = box
+                confidence_score = round(logit.item(), 2)  # Convert logit to a scalar before rounding
+                box_width = x_max - x_min
+                box_height = y_max - y_min
+
+                # Draw bounding box
+                rect = plt.Rectangle((x_min, y_min), box_width, box_height, fill=False, edgecolor='red', linewidth=2)
+                ax.add_patch(rect)
             plt.savefig(os.path.join(save_path, frame_pil))
 
 
         image_list.append(vis_masks)
-
-
-
-    # image_list[0].save(
-    #     os.path.join(save_path, f"{args.text_prompt}.gif"), 
-    #     save_all=True, append_images=image_list[1:],  duration=400)
