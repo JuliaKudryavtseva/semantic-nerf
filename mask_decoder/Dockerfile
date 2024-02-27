@@ -10,7 +10,7 @@ RUN pip install numpy torch torchvision tqdm opencv-python matplotlib
 # wget
 RUN apt update && apt install -y wget
 # git 
-RUN apt update && apt install  -y git
+RUN apt update && apt install -y git
 
 
 RUN mkdir weights && cd weights && wget -q https://dl.fbaipublicfiles.com/segment_anything/sam_vit_h_4b8939.pth  && cd ..
