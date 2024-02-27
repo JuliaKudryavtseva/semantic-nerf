@@ -89,7 +89,7 @@ class SAMNerfModelConfig(ModelConfig):
 
 
 class SAMNerfModel(Model):
-    """Sematic NeRF model
+    """Sematic NeRF model 
 
     Args:
         config: sam_nerf configuration to instantiate model
@@ -252,7 +252,6 @@ class SAMNerfModel(Model):
                                     num_rays=num_rays,
                                     )
 
-        # weights_depth = ray_samples.get_weights(field_outputs[FieldHeadNames.DENSITY])
 
 
         rgb = self.renderer_rgb(
@@ -293,7 +292,7 @@ class SAMNerfModel(Model):
                     num_rays                 
                 )
 
-            outputs["sam_features"] = sam_features # B x 1 
+            outputs["sam_features"] = sam_features # B x 256
         return outputs
         # SAM PREDICITON   
 
@@ -323,27 +322,19 @@ class SAMNerfModel(Model):
         for ind_emb, ind_frame in zip(batch['sam_features_map'], batch['sam_features_emb']):
             batch["pred_sam_features"].append(self.pickle_emb[int(ind_frame)][int(ind_emb)])
 
-        batch["pred_sam_features"] = torch.Tensor(np.array(batch['pred_sam_features']))
+        batch["pred_sam_features"] = torch.tensor(np.array(batch['pred_sam_features']))
 
     
-        # USE\DEFINE CLIP EMBADDINGS
         pred_sam_features_device = batch["pred_sam_features"].to(self.device)
-        # DEFINE LOSS (CLIP, PREDICTED CLIP)
+
         if self.training:
             loss_sem_mse = self.sam_loss(outputs["sam_features"], pred_sam_features_device)
-            loss_dict["sam_loss"] = self.config.sam_loss_weight*loss_sem_mse
+            loss_dict["sam_loss"] = self.config.sam_loss_weight*loss_sem_mse.nanmean()
 
         if self.training:
-            loss = outputs["depth"].detach() * (abs (outputs["sam_features"]-pred_sam_features_device))
+            loss = outputs["depth"].detach() * abs(outputs["sam_features"]-pred_sam_features_device)
             loss_dict["reg_loss"] = self.config.reg_loss_weight * loss.nanmean()
-
-            
-            # loss_sem_cos = self.config.sam_loss_weight * torch.nn.functional.huber_loss(
-            #     outputs["sam_features"], batch["pred_sam_features"].to(self.device), delta=1.25, reduction="none"
-            # )
-            # loss_sem_cos = loss_sem_cos.sum(dim=-1).nanmean() 
-
-        # DEFINE LOSS (CLIP, PREDICTED CLIP)
+         
         
         return loss_dict
 
