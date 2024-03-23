@@ -7,13 +7,13 @@ class CompressionBlock(nn.Module):
     def __init__(self, in_channels, out_channels, kernel_size_conv, kernel_size_pool):
         super(CompressionBlock, self).__init__()
         self.block = nn.Sequential(
-            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size_conv, padding=0, stride=1, bias=False),
+            nn.Conv2d(in_channels, out_channels, kernel_size=kernel_size_conv, padding=0, stride=1, bias=True),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
 
             nn.AvgPool2d(kernel_size=kernel_size_pool),
 
-            nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size_conv, padding=0, stride=1, bias=False),
+            nn.Conv2d(out_channels, out_channels, kernel_size=kernel_size_conv, padding=0, stride=1, bias=True),
             nn.BatchNorm2d(out_channels),
             nn.ReLU(inplace=True),
         )
@@ -42,21 +42,27 @@ class Compression(nn.Module):
         self.adapool = nn.AdaptiveAvgPool2d(
             (config['h_new'], config['w_new'])
             )
+        self.maxpool = nn.AdaptiveMaxPool2d(
+            (config['h_new'], config['w_new'])
+            )
 
         self.head = nn.Conv2d(256, 256, kernel_size=1)
-        
-    def forward(self, x: torch.Tensor, rest_features: torch.Tensor) -> torch.Tensor:
+
+    def forward(self, inp: torch.Tensor) -> torch.Tensor:
+
+        x = inp
         # conv layers
         for layers in self.layers:
             x = layers(x)
 
-        # to the size of h_ew, w_new
-        x = self.adapool(x)
+        # # to the size of h_ew, w_new
+        x = self.adapool(x) # (batch_size, 256, h_new, w_new)
 
-        # add rest features
-        x = torch.cat([x, rest_features], dim=2)
         x = self.head(x)
         return x
+
+
+
 
 
 def block(h, kernel_conv, kernel_pool):
@@ -81,7 +87,8 @@ if __name__ == '__main__':
     config = {
         'h_old': 738, 'h_new': 48, 
         'w_old': 994, 'w_new': 64, 
-        'kernel_size_conv': 3, 'kernel_size_pool': 2
+        'kernel_size_conv': 3, 
+        'kernel_size_pool': 2
         }
 
     large_ft = torch.rand(1, 256, 738, 994)
@@ -90,5 +97,5 @@ if __name__ == '__main__':
     model = Compression(config)
     output = model(large_ft, rest_ft)
 
-    assert output.shape == (1, 256, 64, 64)
+    assert output.shape == (1, 256, 48, 64)
     print('\n === Compression is ready! :) === \n')
