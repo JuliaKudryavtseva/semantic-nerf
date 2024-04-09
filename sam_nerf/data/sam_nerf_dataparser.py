@@ -158,8 +158,12 @@ class SAMData(DataParser):
         assert len(i_eval) == num_eval_images
         if split == "train":
             indices = i_train
-        elif split in ["val", "test"]:
+
+        elif split in ["test"]:
             indices = i_eval
+
+        elif split in ["val"]:
+            indices = i_eval-1
         else:
             raise ValueError(f"Unknown dataparser split {split}")
 
