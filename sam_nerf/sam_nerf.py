@@ -331,7 +331,7 @@ class SAMNerfModel(Model):
             loss_sem_mse = self.sam_loss(outputs["sam_features"], pred_sam_features_device)
             loss_dict["sam_loss"] = self.config.sam_loss_weight*loss_sem_mse.nanmean()
 
-        if self.training:
+            # reg existing
             loss = outputs["depth"].detach() * abs(outputs["sam_features"]-pred_sam_features_device)
             loss_dict["reg_loss"] = self.config.reg_loss_weight * loss.nanmean()
          
