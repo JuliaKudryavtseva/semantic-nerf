@@ -1,6 +1,7 @@
 import json
 import os
 from tqdm.contrib import tzip
+from tqdm import tqdm
 from PIL import Image
 import argparse
 import time 
@@ -9,9 +10,11 @@ import matplotlib.pyplot as plt
 import cv2
 
 import numpy as np
+import pandas as pd
 import gzip
 
 from lang_sam import LangSAM
+from eval_metrics import calulate_ious, get_gt_masks
 
 import warnings
 warnings.filterwarnings("ignore")
@@ -47,10 +50,32 @@ def resize(large_features, fmap):
     features = torch.cat([features, rest_features], dim=2)
     return features
 
-# feature_list=[]
-# for ind in range(256):
-#     features = image_features[ind, :, :].detach().numpy()
-#     sam_feature = cv2.resize( features, (64, 64), interpolation = cv2.INTER_AREA )
+
+def resize_pool(large_features, fmap, frame_name):
+    # one of side is always 64
+    new_dim = int((fmap.max()+1)/64)
+    
+    #choose dims
+    if np.argmax(fmap.shape):
+        new_h, new_w = new_dim, 64
+        fill_h, fill_w = 64-new_dim, 64
+    else:
+        new_h, new_w = 64, new_dim
+        fill_h, fill_w =64, 64-new_dim
+
+    # resizing
+    large_features = torch.tensor(large_features).permute(2, 0, 1)
+    large_features = large_features.unsqueeze(0)
+    resize_pool_fn = torch.nn.AdaptiveAvgPool2d((new_h, new_w))
+    features = resize_pool_fn(large_features)
+
+    # frame_name = frame_name.replace('.jpg', '_rest_features.npy')
+    # rest_features = torch.tensor(np.load(f'data/{DATA_PATH}/segmentation_results/rest_features/{frame_name}'))
+
+    # features = torch.cat([features, rest_features], dim=2)
+    return features
+
+
 
 def visualise_frame_masks(mask, image_pil):
     red_ch = mask[:, :, np.newaxis]
@@ -60,14 +85,32 @@ def visualise_frame_masks(mask, image_pil):
     colored_mask = np.concatenate([255*red_ch, green_ch, blue_ch], axis=2)
 
     result = (0.5*np.array(image_pil)).astype(int) +(0.5*colored_mask).astype(int)
-    # final_mask = Image.fromarray((255*mask).astype('uint8'), mode="L")
-    return result
+    save_vis(result)
+
+
+def save_vis(vis_masks):
+    fig, ax = plt.subplots()
+    ax.imshow(vis_masks)
+    ax.axis('off')
+
+    for box, logit in zip(boxes, logits):
+        x_min, y_min, x_max, y_max = box
+        confidence_score = round(logit.item(), 2)  # Convert logit to a scalar before rounding
+        box_width = x_max - x_min
+        box_height = y_max - y_min
+
+        # Draw bounding box
+        rect = plt.Rectangle((x_min, y_min), box_width, box_height, fill=False, edgecolor='red', linewidth=2)
+        ax.add_patch(rect)
+    plt.savefig(os.path.join(save_path, frame_pil))
 
 
 def load_npy_gz(filename):
     with gzip.open(filename, 'rb') as f:
         array = np.load(f)
     return array
+
+
 
 # parsing args
 def parse_args():
@@ -77,12 +120,15 @@ def parse_args():
     parser.add_argument('--data-path', type=str, default='teatime',  help='Path to the data.')
     parser.add_argument('--exp-name', type=str, default='teatime', help='Here you can specify the name of the experiment.')
     parser.add_argument('--text-prompt', type=str, default='brown teddy bear', help='Here you can specify text prompt.')
-    parser.add_argument('--separate', type=str, default='False', help='Save every masks.')
+    parser.add_argument('--resize', type=bool, default=True)
+    parser.add_argument('--reg', type=bool)
 
     return parser.parse_args()
 
 
 if __name__ == '__main__':
+
+    DATA_PATH = os.environ['DATA_PATH']
 
     # ------ init SAM model ------ 
     CHECKPOINT_PATH = "/weights/sam_vit_h_4b8939.pth"
@@ -96,37 +142,65 @@ if __name__ == '__main__':
     TEXT_PROMPT = args.text_prompt
     # ---------------------------- 
 
+    if args.reg is None:
+        reg = False
+    else:
+        reg = True
+
+    if reg:
+        REG = 'reg'
+    else:
+        REG = 'no_reg'
 
     # ----------- pathes ---------
     # input
-    video_path = os.path.join('renders/test/rgb')  
+    video_path = os.path.join(f'renders/{DATA_PATH}/{REG}/test/rgb')  
     frames = sorted(os.listdir(video_path), key=lambda x: int(x.split('.')[0].split('_')[1]))
 
-    feature_path = os.path.join('renders/test/raw-sam_features_background') 
-    feature_frames = sorted(os.listdir(feature_path), key=lambda x: int(x.split('.')[0].split('_')[1])) 
+    # compressed SAM feature 
+    compress_sam_feature_path = os.path.join(f'data/{DATA_PATH}/compress_features') 
+    sam_feature_path = f'renders/{DATA_PATH}/{REG}/test/raw-sam_features'
 
     # output
     save_path = os.path.join('assets', OUTPUT_NAME, 'vis_prompt', TEXT_PROMPT)   
     os.makedirs(save_path, exist_ok=True)
 
-    fmap = np.load('data/teatime/segmentation_results/features_map.npy')
-    rest_features = torch.tensor(np.load('data/teatime/segmentation_results/rest_features.npy'))
+    # results
+    save_results_path = os.path.join('assets', OUTPUT_NAME)   
+    os.makedirs(save_results_path, exist_ok=True)
+
+    # rest features
+    fmap = np.load(f'data/{DATA_PATH}/segmentation_results/features_map.npy')
+    rest_features = torch.tensor(np.load(f'data/{DATA_PATH}/segmentation_results/rest_features.npy'))
 
     # ---------------------------- 
     
-    print('Experiment name: ', args.exp_name, '\nInput path: ', video_path, 'Output path: ', save_path)
 
-    image_list = []
-    for frame_pil, frame_feature in tzip(frames, feature_frames):
+    print('\n\n')
+    print(' === Experiment name: ', args.exp_name, '\nInput path: ', video_path, ' | Output path: ', save_path, ' === \n')
+    print('With regularization: ', reg)
+    print(' === Decode masks === ')
+
+    all_masks = []
+
+    for frame_pil in tqdm(frames):
+
         # read image
         image_pill=Image.open(os.path.join(video_path, frame_pil)).convert("RGB")
 
+        # load sam_features
+        if args.resize:
+            frame_name = frame_pil.replace('.jpg', '.npy.gz')
+            frame_name_path = os.path.join(sam_feature_path, frame_name)
+            sam_feature = load_npy_gz(frame_name_path)
+            sam_feature = resize_pool(sam_feature, fmap, frame_pil)
 
-        frame_feature_path = os.path.join(feature_path, frame_feature)
-        image_features = load_npy_gz(frame_feature_path)
-        
-        # RESIZE HERE
-        sam_feature=resize(image_features, fmap)
+        else:
+            frame_name = frame_pil.replace('jpg', 'pt')
+            sam_feature = torch.load(os.path.join(compress_sam_feature_path, frame_name), map_location='cpu')
+
+        sam_feature = torch.cat([sam_feature, rest_features], dim=2)
+
         
         # Text SAM segmentation
         masks, boxes, phrases, logits = model.predict(image_featues=sam_feature, 
@@ -138,34 +212,51 @@ if __name__ == '__main__':
             H, W = np.array(image_pill).shape[:2]
             mask = np.zeros((H, W))
         else:
-            # ind_rel = torch.argmax(logits)
-            # mask = masks[ind_rel].squeeze().numpy()
-            masks = [mask.squeeze().numpy() for mask in masks]
-            mask = (np.array(masks).mean(axis=0) > 0).astype(int) # concat all masks in one frame
+            mask = [mask.squeeze().numpy() for mask in masks]
+            mask = (np.array(mask).mean(axis=0) > 0).astype(int) # concat all masks in one frame
 
         # smoothing
-        opening = cv2.morphologyEx(mask.astype('uint8'), cv2.MORPH_OPEN, np.ones((10,10), np.uint8))
-        mask = cv2.filter2D(opening,-1, np.ones((20,20),np.float32)/400)
+        opening = cv2.morphologyEx(mask.astype('uint8'), cv2.MORPH_OPEN, np.ones((5,5), np.uint8))
+        mask = cv2.filter2D(opening,-1, np.ones((10,10),np.float32)/100)
 
-
+        # visualization
         vis_masks = visualise_frame_masks(mask, image_pill)
+        all_masks.append(mask)
 
-        if args.separate:
+    print(' === Evaluate metrics: IOUs === ')
 
-            fig, ax = plt.subplots()
-            ax.imshow(vis_masks)
-            ax.axis('off')
+    
+    # get ground truth masks
+    gt_masks_path = f'data/{DATA_PATH}/ground_truth'
+    gt_masks = get_gt_masks(gt_masks_path, TEXT_PROMPT, frames, all_masks[0].shape)
 
-            for box, logit in zip(boxes, logits):
-                x_min, y_min, x_max, y_max = box
-                confidence_score = round(logit.item(), 2)  # Convert logit to a scalar before rounding
-                box_width = x_max - x_min
-                box_height = y_max - y_min
+    # calculate metrics
+    IOUs, IOUS_per_frame  = calulate_ious(pred_masks=all_masks, gt_masks=gt_masks)
 
-                # Draw bounding box
-                rect = plt.Rectangle((x_min, y_min), box_width, box_height, fill=False, edgecolor='red', linewidth=2)
-                ax.add_patch(rect)
-            plt.savefig(os.path.join(save_path, frame_pil))
+    # create df
+    columns = ['text prompt', 'reg', 'IOU mean'] + frames
+    try:
+        df_ious = pd.read_csv(f'assets/{DATA_PATH}/results.csv')
+    except FileNotFoundError:
+        df_ious = pd.DataFrame(columns=columns)
 
 
-        image_list.append(vis_masks)
+    df_ious_curr = pd.DataFrame([[TEXT_PROMPT, reg, IOUs] + IOUS_per_frame], columns=columns)
+    
+    # drop if there is eval
+    
+    if (TEXT_PROMPT in df_ious['text prompt'].values):
+        text_prompt_ind = int(df_ious[df_ious['text prompt']==TEXT_PROMPT].index[0])
+        if (reg == df_ious.loc[text_prompt_ind, 'reg']):
+            df_ious.drop(text_prompt_ind, axis=0, inplace = True)
+
+
+    df_ious = pd.concat([df_ious, df_ious_curr], ignore_index = True)
+
+    # save df
+    metrics_path = os.path.join(save_results_path, 'results.csv')
+    df_ious = df_ious.sort_values(by=['text prompt', 'reg'])
+    df_ious.to_csv(metrics_path, index=False)
+
+
+    print(f'{IOUs=}\n')
