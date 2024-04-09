@@ -48,6 +48,9 @@ if __name__ == '__main__':
     # save sam features in save_path
     path2frame_save = os.path.join(save_path, 'seg_features')
     os.makedirs(path2frame_save, exist_ok=True)
+
+    path2rest_ft_save = os.path.join(save_path, 'rest_features')
+    os.makedirs(path2rest_ft_save, exist_ok=True)
     
     print('Experiment name: ', args.exp_name, '\nInput path: ', video_path, 'Output path: ', save_path)
 
@@ -75,6 +78,9 @@ if __name__ == '__main__':
         # make better
         band_features = sam_features[:, :, h_new:, :w_new]
         rest_features.append(band_features)
+        rest_features_path = os.path.join(path2rest_ft_save, image_pil.split('.')[0] + '_rest_features.npy') 
+        np.save(rest_features_path, band_features.cpu().detach().numpy())
+
         sam_features = sam_features[:, :, :h_new, :w_new]
 
 
@@ -100,6 +106,7 @@ if __name__ == '__main__':
 
     frame_map_path = os.path.join(save_path, 'features_map.npy') 
     np.save(frame_map_path, y.astype(int))
+    np.save(os.path.join(save_path, 'hw_new.npy') , np.array([h_new, w_new]).astype(int))
 
     rest_features = torch.cat(rest_features, dim = 0) # 180, 256, 16, 64
     rest_features = rest_features.mean(dim=0).unsqueeze(0)
