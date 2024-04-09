@@ -39,30 +39,61 @@ Docker container
 
 ```
 
+docker run -it --rm --gpus device=5  --memory=100gb --shm-size=100gb -e "DATA_PATH=$DATA_PATH" -v $PWD:/workspace -v /home/j.kudryavtseva/.cache/:/home/user/.cache --name kudryavtseva.sem_nerf -u root gbobrovskikh.nerfstudio:dev   
 
-docker run -it --rm --gpus device=5 -p 7087:7087 --memory=50gb --shm-size=50gb  -e "DATA_PATH=$DATA_PATH" -v $PWD:/workspace -v /home/j.kudryavtseva/.cache/:/home/user/.cache -u root --name  kudryavtseva.sem_nerf gbobrovskikh.nerfstudio:dev   
-
-```
 
 pip install -e . 
 ns-install-cli
 
+# train NeRF
+
 ns-train sam-nerf --data data/$DATA_PATH --vis viewer --viewer.websocket-port=7087
 
-ns-viewer --load-config outputs/teatime/sam-nerf/2024-02-12_203351/config.yml --viewer.websocket-port=7087
+
+# render sam-features # render rgb
+
+ns-render dataset --load-config outputs/$DATA_PATH/sam-nerf/2024-04-08_142627/config.yml --rendered-output-names raw-sam_features  --colormap-options.colormap-min -1 --split test
+
+ns-render dataset --load-config outputs/$DATA_PATH/sam-nerf/2024-04-08_142627/config.yml --rendered-output-names raw-sam_features  --colormap-options.colormap-min -1 --split val
+
+ns-render dataset --load-config outputs/$DATA_PATH/sam-nerf/2024-04-08_142627/config.yml --rendered-output-names rgb --split test
+ns-render dataset --load-config outputs/$DATA_PATH/sam-nerf/2024-04-08_142627/config.yml --rendered-output-names rgb --split val
 
 
-ns-render dataset --load-config outputs/teatime/sam-nerf/2024-02-12_203351/config.yml --rendered-output-names raw-sam_features  --colormap-options.colormap-min -1 --split test
 
-# render rgb
-ns-render dataset --load-config outputs/teatime/sam-nerf/2024-02-12_203351/config.yml --rendered-output-names rgb --split test
+
+
+# view pre-trained
+ns-viewer --load-config outputs/teatime/sam-nerf/2024-02-21_120120/config.yml --viewer.websocket-port=7087
+
 
 ```
-docker run --gpus all -v /home/j.kudryavtseva/.cache/:/home/user/.cache/ -u root -p 7087:7087 --rm -it --memory=50gb gbobrovskikh.nerfstudio:dev
+
+
+# Train compression block
 ```
+
+
+docker build -t kudryavtseva.compression_block -f compression_block/Dockerfile  .
+
+docker run -it --rm --gpus device=3 \
+            -e "DATA_PATH=$DATA_PATH" \
+            -v $PWD/compression_block:/workspace \
+            -v $PWD/data:/workspace/data \
+            -v $PWD/assets:/workspace/assets \
+            -v $PWD/renders:/workspace/renders \
+            --name kudryavtseva.compression_block \
+            kudryavtseva.compression_block
+
+python3 training.py
+python3 evaluation.py
+```
+
+
 ### Decode masks
 
 ```
+
 DATA_PATH=teatime
 
 docker build -t kudryavtseva.decoder -f mask_decoder/Dockerfile  .
@@ -70,7 +101,7 @@ docker build -t kudryavtseva.decoder -f mask_decoder/Dockerfile  .
 docker run -it --rm \
             -e "DATA_PATH=$DATA_PATH" \
             -v $PWD/mask_decoder:/workspace \
-            -v $PWD/data:/workspace/dataset \
+            -v $PWD/data:/workspace/data \
             -v $PWD/assets:/workspace/assets \
             -v $PWD/renders:/workspace/renders \
             --name kudryavtseva.decoder \
@@ -78,5 +109,26 @@ docker run -it --rm \
 
 pip install -e .
 
-python3 decode_masks.py
+./test.sh $DATA_PATH
 ```
+
+
+# checkpoints
+
+## teatime:
+
+with reg: 2024-04-02_224507
+no reg: 2024-04-04_144538
+
+# espresso 
+
+no reg: 2024-04-05_125843
+reg: 2024-04-05_220246
+
+# waldo_espress
+reg: 2024-04-06_205615
+no reg: 2024-04-07_123748
+
+# dozer_nerfgun_waldo
+
+reg: 2024-04-07_164143
